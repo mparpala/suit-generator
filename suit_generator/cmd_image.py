@@ -167,6 +167,46 @@ class EnvelopeStorage:
             "class_name": "nRF54H20_sys",
             "role": ManifestRole.SEC_SYSCTRL,
         },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_sample_root",
+            "role": ManifestRole.APP_ROOT,
+        },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_sample_app",
+            "role": ManifestRole.APP_LOCAL_1,
+        },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_sample_app_recovery",
+            "role": ManifestRole.APP_RECOVERY,
+        },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_sample_rad",
+            "role": ManifestRole.RAD_LOCAL_1,
+        },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_sample_rad_recovery",
+            "role": ManifestRole.RAD_RECOVERY,
+        },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_nordic_top",
+            "role": ManifestRole.SEC_TOP,
+        },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_sec",
+            "role": ManifestRole.SEC_SDFW,
+        },
+        {
+            "vendor_name": "nordicsemi.com",
+            "class_name": "nRF9280_sys",
+            "role": ManifestRole.SEC_SYSCTRL,
+        },
     ]
 
     def __init__(self, base_address: int, load_defaults=True, kconfig=None):
@@ -386,6 +426,77 @@ class EnvelopeStorageNrf54h20(EnvelopeStorage):
         },
     ]
 
+class EnvelopeStorageNrf9280(EnvelopeStorage):
+    """Class generating SUIT storage binary in upcoming format."""
+
+    _LAYOUT = [
+        {
+            "role": ManifestRole.SEC_TOP,
+            "offset": 4096,
+            "size": 1536,
+            "domain": ManifestDomain.SECURE,
+        },
+        {
+            "role": ManifestRole.SEC_SDFW,
+            "offset": 2048,
+            "size": 1024,
+            "domain": ManifestDomain.SECURE,
+        },
+        {
+            "role": ManifestRole.SEC_SYSCTRL,
+            "offset": 3072,
+            "size": 1024,
+            "domain": ManifestDomain.SECURE,
+        },
+        {
+            "role": ManifestRole.RAD_RECOVERY,
+            "offset": 4096 + 1024 * 1,
+            "size": 1024,
+            "domain": ManifestDomain.RADIO,
+        },
+        {
+            "role": ManifestRole.RAD_LOCAL_1,
+            "offset": 4096 + 1024 * 2,
+            "size": 1024,
+            "domain": ManifestDomain.RADIO,
+        },
+        {
+            "role": ManifestRole.RAD_LOCAL_2,
+            "offset": 4096 + 1024 * 3,
+            "size": 1024,
+            "domain": ManifestDomain.RADIO,
+        },
+        {
+            "role": ManifestRole.APP_ROOT,
+            "offset": 8192 + 1024 * 1,
+            "size": 2048,
+            "domain": ManifestDomain.APPLICATION,
+        },
+        {
+            "role": ManifestRole.APP_RECOVERY,
+            "offset": 8192 + 1024 * 3,
+            "size": 2048,
+            "domain": ManifestDomain.APPLICATION,
+        },
+        {
+            "role": ManifestRole.APP_LOCAL_1,
+            "offset": 8192 + 1024 * 5,
+            "size": 1024,
+            "domain": ManifestDomain.APPLICATION,
+        },
+        {
+            "role": ManifestRole.APP_LOCAL_2,
+            "offset": 8192 + 1024 * 6,
+            "size": 1024,
+            "domain": ManifestDomain.APPLICATION,
+        },
+        {
+            "role": ManifestRole.APP_LOCAL_3,
+            "offset": 8192 + 1024 * 7,
+            "size": 1024,
+            "domain": ManifestDomain.APPLICATION,
+        },
+    ]
 
 class ImageCreator:
     """Helper class for extracting data from SUIT envelope and creating hex files."""
@@ -445,9 +556,16 @@ class ImageCreator:
         envelopes: list[SuitEnvelope],
         storage_address: int,
         dir_name: str,
+        platform: str,
         config_file: str,
     ) -> None:
-        storage = EnvelopeStorageNrf54h20(storage_address, kconfig=config_file)
+        if platform == "nRF54H20":
+            storage = EnvelopeStorageNrf54h20(storage_address, kconfig=config_file)
+        elif platform == "nRF9280":
+            storage = EnvelopeStorageNrf9280(storage_address, kconfig=config_file)
+        else:
+            raise GeneratorError(f"Unknown platform: {platform}")
+        
         for envelope in envelopes:
             storage.add_envelope(envelope)
 
@@ -486,6 +604,7 @@ class ImageCreator:
         input_files: list[str],
         storage_output_directory: str,
         storage_address: int,
+        platform: str,
         config_file: str | None,
     ) -> None:
         """Create storage and payload hex files allowing boot execution path.
@@ -493,6 +612,7 @@ class ImageCreator:
         :param input_files: file paths to SUIT envelope
         :param storage_output_directory: directory path to store hex files with SUIT storage contents
         :param storage_address: address of SUIT storage
+        :param platform: platfrom in use, nRF54H20 or nRF9280
         :param config_file: path to KConfig file containing MPI settings
         """
         try:
@@ -508,6 +628,7 @@ class ImageCreator:
                 envelopes,
                 storage_address,
                 storage_output_directory,
+                platform,
                 config_file,
             )
         except FileNotFoundError as error:
